@@ -54,17 +54,27 @@ jobs:
           
           # Get changed files between the latest commit and the previous commit
           CHANGED_FILES=$(git diff --name-only $PREV_COMMIT $LATEST_COMMIT)
-          CHANGED_DIRS=$(echo "$CHANGED_FILES" | awk -F'/' '{print $1}' | sort -u)
+          
+          # Extract unique directories from changed files, ensuring no empty values are included
+          CHANGED_DIRS=$(echo "$CHANGED_FILES" | awk -F'/' '{print $1}' | sort -u | grep -v '^$')
           
           echo "Changed directories: $CHANGED_DIRS"
-          echo "changed_dirs=$CHANGED_DIRS" >> $GITHUB_ENV
+          
+          # Set changed_dirs as a comma-separated list for processing later
+          if [ -n "$CHANGED_DIRS" ]; then
+            echo "changed_dirs=${CHANGED_DIRS// /,}" >> $GITHUB_ENV  # Replace spaces with commas for proper formatting
+          else
+            echo "changed_dirs=" >> $GITHUB_ENV
+          fi
 
       - name: Deploy Changed Functions
         if: env.changed_dirs != ''
         run: |
-          for function_dir in $changed_dirs; do
+          IFS=',' read -r -a function_dirs <<< "$changed_dirs"  # Split changed_dirs into an array
+          
+          for function_dir in "${function_dirs[@]}"; do
             echo "Processing $function_dir"
-            cd $function_dir
+            cd "$function_dir"
             python -m venv env
             source env/bin/activate
             
@@ -88,7 +98,7 @@ jobs:
             cd ..
             
             # Update the Lambda function code in AWS
-            aws lambda update-function-code --function-name $function_dir --zip-file fileb://function.zip --region ${{ secrets.AWS_REGION }} || { echo 'Deployment failed'; exit 1; }
+            aws lambda update-function-code --function-name "$function_dir" --zip-file fileb://function.zip --region ${{ secrets.AWS_REGION }} || { echo 'Deployment failed'; exit 1; }
             
             rm -rf env package function.zip
             cd ..
