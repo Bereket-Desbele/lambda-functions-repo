@@ -30,6 +30,8 @@ jobs:
 
       - name: Identify Changed Functions
         run: |
+          set -e  # Exit immediately if a command exits with a non-zero status
+          
           echo "Checking for commits in the repository..."
           if [ "$(git rev-list --count HEAD)" -eq 0 ]; then
             echo "No commits found in the repository."
@@ -60,14 +62,15 @@ jobs:
               VALID_DIRS="$VALID_DIRS $dir"
               echo "Valid directory: $dir"
             else
-              echo "Invalid directory: $dir"
+              echo "Invalid directory (missing files): $dir"
             fi
           done
 
           echo "Valid directories: $VALID_DIRS"
 
           if [ -n "$VALID_DIRS" ]; then
-            echo "changed_dirs=$(echo $VALID_DIRS | tr ' ' ',')" >> $GITHUB_ENV
+            # Set changed_dirs as a comma-separated list for processing later
+            echo "changed_dirs=$(echo "$VALID_DIRS" | tr ' ' ',')" >> $GITHUB_ENV
           else
             echo "changed_dirs=" >> $GITHUB_ENV
           fi
@@ -75,11 +78,20 @@ jobs:
       - name: Deploy Changed Functions
         if: env.changed_dirs != ''
         run: |
+          set -e  # Exit immediately if a command exits with a non-zero status
+
           echo "Deploying changed functions..."
           IFS=',' read -r -a function_dirs <<< "$changed_dirs"  # Split changed_dirs into an array
           
           for function_dir in "${function_dirs[@]}"; do
             echo "Processing $function_dir"
+            
+            # Check if directory exists before changing into it
+            if [ ! -d "$function_dir" ]; then
+              echo "Directory does not exist: $function_dir"
+              continue  # Skip this iteration if the directory doesn't exist
+            fi
+            
             cd "$function_dir"
             
             # Set up a dedicated virtual environment
@@ -88,26 +100,29 @@ jobs:
 
             # Install dependencies if requirements.txt exists
             mkdir -p package
+            
             if [ -f requirements.txt ]; then
-              pip install -r requirements.txt --target ./package/
+              pip install --target ./package/ -r requirements.txt || { echo 'Failed to install dependencies'; exit 1; }
             fi
             
             # Add Lambda handler to package
             cp lambda_function.py package/
 
             # Package everything into a zip file
-            cd package
+            cd package || { echo 'Failed to enter package directory'; exit 1; }
             zip -r ../function.zip .
             cd ..
 
-            # Extract the function name from the directory path
+            # Extract the function name from the directory path (assuming it's the last part of the path)
             FUNCTION_NAME=$(basename "$function_dir")
             echo "Updating Lambda function: $FUNCTION_NAME"
 
             # Update the Lambda function code in AWS
-            aws lambda update-function-code --function-name "$FUNCTION_NAME" --zip-file fileb://function.zip --region ${{ secrets.AWS_REGION }}
+            aws lambda update-function-code --function-name "$FUNCTION_NAME" --zip-file fileb://function.zip --region "${{ secrets.AWS_REGION }}" || { echo 'Failed to update Lambda function'; exit 1; }
 
             # Clean up
             rm -rf env package function.zip
+            
             cd ..
           done
+
