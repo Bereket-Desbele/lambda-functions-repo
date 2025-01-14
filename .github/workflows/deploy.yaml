@@ -27,18 +27,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: List Branches and Commits
-        run: |
-          echo "Available branches:"
-          git branch -a
-          echo "Commit history:"
-          git log --oneline --graph --decorate --all
-
       - name: Identify Changed Functions
-        id: changes
         run: |
-          git fetch origin main
-          
           # Check if there are any commits in the repository
           if [ $(git rev-list --count HEAD) -eq 0 ]; then
             echo "No commits found in the repository."
@@ -65,7 +55,6 @@ jobs:
             echo "changed_dirs=${CHANGED_DIRS// /,}" >> $GITHUB_ENV  # Replace spaces with commas for proper formatting
           else
             echo "changed_dirs=" >> $GITHUB_ENV
-          fi
 
       - name: Deploy Changed Functions
         if: env.changed_dirs != ''
