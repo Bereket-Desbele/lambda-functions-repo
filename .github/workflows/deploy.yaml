@@ -70,6 +70,7 @@ jobs:
             echo "changed_dirs=$(echo $VALID_DIRS | tr ' ' ',')" >> $GITHUB_ENV
           else
             echo "changed_dirs=" >> $GITHUB_ENV
+          fi
 
       - name: Deploy Changed Functions
         if: env.changed_dirs != ''
