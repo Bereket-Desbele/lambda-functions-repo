@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Fetch all history for all branches
 
       - name: Set Up Python
         uses: actions/setup-python@v2
@@ -24,6 +26,13 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: List Branches and Commits
+        run: |
+          echo "Available branches:"
+          git branch -a
+          echo "Commit history:"
+          git log --oneline --graph --decorate --all
 
       - name: Identify Changed Functions
         id: changes
@@ -41,14 +50,14 @@ jobs:
           LATEST_COMMIT=$(git rev-parse origin/main)
           
           # Get the previous commit hash (if available)
-          PREV_COMMIT=$(git rev-parse origin/main^1 || echo "HEAD~1")
+          PREV_COMMIT=$(git rev-parse origin/main^1 2>/dev/null || echo "HEAD~1")
           
           # Get changed files between the latest commit and the previous commit
           CHANGED_FILES=$(git diff --name-only $PREV_COMMIT $LATEST_COMMIT)
           CHANGED_DIRS=$(echo "$CHANGED_FILES" | awk -F'/' '{print $1}' | sort -u)
           
           echo "Changed directories: $CHANGED_DIRS"
-          echo "changed_dirs=$CHANGED_DIRS" >> $GITHUB_ENV 
+          echo "changed_dirs=$CHANGED_DIRS" >> $GITHUB_ENV
 
       - name: Deploy Changed Functions
         if: env.changed_dirs != ''
@@ -58,18 +67,29 @@ jobs:
             cd $function_dir
             python -m venv env
             source env/bin/activate
+            
             if [ -f requirements.txt ]; then
-              pip install -r requirements.txt
+              pip install -r requirements.txt --target ./package/
             fi
+            
             deactivate
+            
             mkdir -p package
-            cp -r env/lib/python3.8/site-packages/* package/
             cp lambda_function.py package/
+            
+            # Copy installed packages to package directory if they exist
+            if [ -d env/lib/python3.8/site-packages ]; then
+              cp -r env/lib/python3.8/site-packages/* package/
+            fi
+            
             cd package
+            
             zip -r ../function.zip .
             cd ..
+            
+            # Update the Lambda function code in AWS
             aws lambda update-function-code --function-name $function_dir --zip-file fileb://function.zip --region ${{ secrets.AWS_REGION }} || { echo 'Deployment failed'; exit 1; }
+            
             rm -rf env package function.zip
             cd ..
           done
-

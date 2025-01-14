@@ -1,5 +1,5 @@
 import json
-from bs4 import BeautifulSoup   # External dependency
+from bs4 import BeautifulSoup  # External dependency
 
 def lambda_handler(event, context):
     html_doc = "<html><head><title>Test</title></head><body></body></html>"
