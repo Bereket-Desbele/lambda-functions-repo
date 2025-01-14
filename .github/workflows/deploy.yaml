@@ -1,0 +1,59 @@
+name: Deploy Lambda Functions
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Set Up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Identify Changed Functions
+        id: changes
+        run: |
+          git fetch origin main
+          PREV_COMMIT=$(git rev-parse origin/main^1)
+          CHANGED_FILES=$(git diff --name-only $PREV_COMMIT HEAD)
+          CHANGED_DIRS=$(echo "$CHANGED_FILES" | awk -F'/' '{print $1}' | sort -u)
+          echo "Changed directories: $CHANGED_DIRS"
+          echo "changed_dirs=$CHANGED_DIRS" >> $GITHUB_ENV
+
+      - name: Deploy Changed Functions
+        if: env.changed_dirs != ''
+        run: |
+          for function_dir in $changed_dirs; do
+            echo "Processing $function_dir"
+            cd $function_dir
+            python -m venv env
+            source env/bin/activate
+            if [ -f requirements.txt ]; then
+              pip install -r requirements.txt
+            fi
+            deactivate
+            mkdir -p package
+            cp -r env/lib/python3.8/site-packages/* package/
+            cp lambda_function.py package/
+            cd package
+            zip -r ../function.zip .
+            cd ..
+            aws lambda update-function-code --function-name $function_dir --zip-file fileb://function.zip --region ${{ secrets.AWS_REGION }}
+            rm -rf env package function.zip
+            cd ..
+          done
