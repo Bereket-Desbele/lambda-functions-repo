@@ -37,23 +37,30 @@ jobs:
             exit 0
           fi
 
-          # Get the latest commit hash from the main branch
+          # Get the latest commit hash
           LATEST_COMMIT=$(git rev-parse HEAD)
 
           # Get the previous commit hash (if available)
-          PREV_COMMIT=$(git rev-parse HEAD~1 || echo "HEAD~1")
+          PREV_COMMIT=$(git rev-parse HEAD~1 2>/dev/null || echo "")
 
-          # Get changed files between the latest commit and the previous commit
+          # Get changed files between the latest and previous commits
           CHANGED_FILES=$(git diff --name-only "$PREV_COMMIT" "$LATEST_COMMIT")
 
-          # Extract unique directories from changed files, ensuring no empty values are included
+          # Extract unique directories from changed files
           CHANGED_DIRS=$(echo "$CHANGED_FILES" | awk -F'/' '{print $1}' | sort -u | grep -v '^$')
 
-          echo "Changed directories: $CHANGED_DIRS"
-
-          # Set changed_dirs as a comma-separated list for processing later
-          if [ -n "$CHANGED_DIRS" ]; then
-            echo "changed_dirs=$(echo "$CHANGED_DIRS" | tr '\n' ',')" >> $GITHUB_ENV
+          VALID_DIRS=""
+          for dir in $CHANGED_DIRS; do
+            if [ -f "$dir/lambda_function.py" ] && [ -f "$dir/requirements.txt" ]; then
+              VALID_DIRS="$VALID_DIRS $dir"
+            fi
+          done
+          
+          echo "Valid directories: $VALID_DIRS"
+          
+          # Set valid_dirs as a comma-separated list for processing later
+          if [ -n "$VALID_DIRS" ]; then
+            echo "changed_dirs=$(echo $VALID_DIRS | tr ' ' ',')" >> $GITHUB_ENV
           else
             echo "changed_dirs=" >> $GITHUB_ENV
 
@@ -61,7 +68,7 @@ jobs:
         if: env.changed_dirs != ''
         run: |
           IFS=',' read -r -a function_dirs <<< "$changed_dirs"  # Split changed_dirs into an array
-
+          
           for function_dir in "${function_dirs[@]}"; do
             echo "Processing $function_dir"
             cd "$function_dir"
@@ -75,8 +82,7 @@ jobs:
             if [ -f requirements.txt ]; then
               pip install -r requirements.txt --target ./package/
             fi
-            deactivate
-
+            
             # Add Lambda handler to package
             cp lambda_function.py package/
 
