@@ -29,17 +29,26 @@ jobs:
         id: changes
         run: |
           git fetch origin main
+          
+          # Check if there are any commits in the repository
           if [ $(git rev-list --count HEAD) -eq 0 ]; then
             echo "No commits found in the repository."
             echo "changed_dirs=" >> $GITHUB_ENV
             exit 0
           fi
 
-          PREV_COMMIT=$(git rev-parse origin/main^1 || echo "HEAD")
-          CHANGED_FILES=$(git diff --name-only $PREV_COMMIT HEAD)
+          # Get the latest commit hash from the main branch
+          LATEST_COMMIT=$(git rev-parse origin/main)
+          
+          # Get the previous commit hash (if available)
+          PREV_COMMIT=$(git rev-parse origin/main^1 || echo "HEAD~1")
+          
+          # Get changed files between the latest commit and the previous commit
+          CHANGED_FILES=$(git diff --name-only $PREV_COMMIT $LATEST_COMMIT)
           CHANGED_DIRS=$(echo "$CHANGED_FILES" | awk -F'/' '{print $1}' | sort -u)
+          
           echo "Changed directories: $CHANGED_DIRS"
-          echo "changed_dirs=$CHANGED_DIRS" >> $GITHUB_ENV
+          echo "changed_dirs=$CHANGED_DIRS" >> $GITHUB_ENV 
 
       - name: Deploy Changed Functions
         if: env.changed_dirs != ''
