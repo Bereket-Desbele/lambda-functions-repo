@@ -1,5 +1,5 @@
 import json
-import requests  # External dependency
+import requests   # External dependency
 
 def lambda_handler(event, context):
     response = requests.get("https://loripsum.net/api/")
