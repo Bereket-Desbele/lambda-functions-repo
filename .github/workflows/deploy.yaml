@@ -19,7 +19,7 @@ jobs:
           python-version: '3.8'
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -28,7 +28,7 @@ jobs:
       - name: Identify Changed Functions
         id: changes
         run: |
-          git fetch origin main
+          git pull origin main
           PREV_COMMIT=$(git rev-parse origin/main^1)
           CHANGED_FILES=$(git diff --name-only $PREV_COMMIT HEAD)
           CHANGED_DIRS=$(echo "$CHANGED_FILES" | awk -F'/' '{print $1}' | sort -u)
@@ -53,7 +53,8 @@ jobs:
             cd package
             zip -r ../function.zip .
             cd ..
-            aws lambda update-function-code --function-name $function_dir --zip-file fileb://function.zip --region ${{ secrets.AWS_REGION }}
+            aws lambda update-function-code --function-name $function_dir --zip-file fileb://function.zip --region ${{ secrets.AWS_REGION }} || { echo 'Deployment failed'; exit 1; }
             rm -rf env package function.zip
             cd ..
           done
+
