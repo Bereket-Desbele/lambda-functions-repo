@@ -39,34 +39,44 @@ jobs:
 
           # Get the latest commit hash
           LATEST_COMMIT=$(git rev-parse HEAD)
+          echo "LATEST_COMMIT: $LATEST_COMMIT"
 
           # Get the previous commit hash (if available)
           PREV_COMMIT=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+          echo "PREV_COMMIT: $PREV_COMMIT"
 
           # Get changed files between the latest and previous commits
           CHANGED_FILES=$(git diff --name-only "$PREV_COMMIT" "$LATEST_COMMIT")
+          echo "CHANGED_FILES: $CHANGED_FILES"
 
           # Extract unique directories from changed files
           CHANGED_DIRS=$(echo "$CHANGED_FILES" | awk -F'/' '{print $1}' | sort -u | grep -v '^$')
+          echo "CHANGED_DIRS: $CHANGED_DIRS"
 
           VALID_DIRS=""
           for dir in $CHANGED_DIRS; do
+            echo "Checking directory: $dir"
             if [ -f "$dir/lambda_function.py" ] && [ -f "$dir/requirements.txt" ]; then
               VALID_DIRS="$VALID_DIRS $dir"
+              echo "Valid directory: $dir"
+            else
+              echo "Invalid directory: $dir"
             fi
           done
-          
+
           echo "Valid directories: $VALID_DIRS"
-          
+
           # Set valid_dirs as a comma-separated list for processing later
           if [ -n "$VALID_DIRS" ]; then
-            echo "changed_dirs=$(echo $VALID_DIRS | tr ' ' ',')" >> $GITHUB_ENV
+            echo "changed_dirs=$(echo "$VALID_DIRS" | tr ' ' ',')" >> $GITHUB_ENV
           else
             echo "changed_dirs=" >> $GITHUB_ENV
+          fi
 
       - name: Deploy Changed Functions
         if: env.changed_dirs != ''
         run: |
+          echo "Deploying changed functions..."
           IFS=',' read -r -a function_dirs <<< "$changed_dirs"  # Split changed_dirs into an array
           
           for function_dir in "${function_dirs[@]}"; do
