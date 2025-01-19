@@ -1,4 +1,4 @@
-def handler(event, context):
+def lmabda_handler(event, context):
     """
     Post Authentication trigger handler
     """
