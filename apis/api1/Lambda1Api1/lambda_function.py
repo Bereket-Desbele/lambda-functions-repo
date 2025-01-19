@@ -13,6 +13,13 @@ def lambda_handler(event, context):
         parsed_content = {"error": "Invalid JSON", "content": content}
 
     return {
-        'statusCode': 200,
-        'body': json.dumps(parsed_content)
+        "statusCode": 200,  # Required
+        "headers": {        # Required for CORS
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Content-Type": "application/json"
+        },
+        "body": json.dumps({  # Must be string
+            "message": parsed_content
+        })
     }
