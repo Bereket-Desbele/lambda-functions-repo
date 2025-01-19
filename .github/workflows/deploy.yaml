@@ -102,8 +102,12 @@ jobs:
             mkdir -p package
             
             if [ -f requirements.txt ]; then
-              pip install --target ./package/ -r requirements.txt || { echo 'Failed to install dependencies'; exit 1; }
+              pip install --target ./package/ -r requirements.txt || { echo 'Failed to install dependencies'; pip freeze; exit 1; }
             fi
+            
+            # Log installed packages
+            echo "Installed packages:"
+            pip freeze
             
             # Add Lambda handler to package
             cp lambda_function.py package/
