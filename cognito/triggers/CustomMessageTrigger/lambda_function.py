@@ -1,5 +1,3 @@
-import json
-
 def lambda_handler(event, context):
     trigger_source = event['triggerSource']
     user_attributes = event['request']['userAttributes']
