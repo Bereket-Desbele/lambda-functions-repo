@@ -8,3 +8,4 @@ def lambda_handler(event, context):
     # e.g., create user profile in database, send welcome email, etc.
 
     return event
+

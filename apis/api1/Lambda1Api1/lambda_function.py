@@ -23,4 +23,3 @@ def lambda_handler(event, context):
             "message": parsed_content
         })
     }
-
